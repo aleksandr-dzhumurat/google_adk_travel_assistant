@@ -1,0 +1,131 @@
+import os
+
+import requests
+from dotenv import load_dotenv
+
+print(f"Loaded vars: {load_dotenv()}")
+
+MAPBOX_TOKEN = os.getenv("MAPBOX_ACCESS_TOKEN")
+if not MAPBOX_TOKEN:
+    raise ValueError("MAPBOX_ACCESS_TOKEN not found in .env file")
+
+MAPBOX_API_BASE = "https://api.mapbox.com"
+
+
+def get_city_center(city: str, country: str) -> dict:
+    try:
+        query = f"{city}, {country}"
+        url = f"{MAPBOX_API_BASE}/geocoding/v5/mapbox.places/{requests.utils.quote(query)}.json"
+        params = {
+            "access_token": MAPBOX_TOKEN,
+            "limit": 1,
+            "types": "place",
+        }
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("features"):
+            feature = data["features"][0]
+            coords = feature["geometry"]["coordinates"]
+            return {
+                "longitude": coords[0],
+                "latitude": coords[1],
+                "city": city,
+                "country": country,
+                "place_name": feature["place_name"],
+            }
+        else:
+            return {"error": f"Could not find coordinates for {city}, {country}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def geocode_address(address: str) -> dict:
+    try:
+        url = f"{MAPBOX_API_BASE}/geocoding/v5/mapbox.places/{requests.utils.quote(address)}.json"
+        params = {"access_token": MAPBOX_TOKEN, "limit": 1}
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("features"):
+            feature = data["features"][0]
+            return {
+                "coordinates": feature["geometry"]["coordinates"],
+                "place_name": feature["place_name"],
+                "full_response": feature,
+            }
+        else:
+            return {"error": "No results found"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def geocode_address_near(
+    address: str,
+    proximity_latitude: float,
+    proximity_longitude: float,
+    city: str,
+    country: str,
+) -> dict:
+    try:
+        enhanced_query = f"{address}, {city}, {country}"
+        url = f"{MAPBOX_API_BASE}/geocoding/v5/mapbox.places/{requests.utils.quote(enhanced_query)}.json"
+
+        bbox_delta = 0.45
+        bbox = (
+            f"{proximity_longitude - bbox_delta},{proximity_latitude - bbox_delta},"
+            f"{proximity_longitude + bbox_delta},{proximity_latitude + bbox_delta}"
+        )
+
+        params = {
+            "access_token": MAPBOX_TOKEN,
+            "limit": 1,
+            "proximity": f"{proximity_longitude},{proximity_latitude}",
+            "bbox": bbox,
+        }
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("features"):
+            feature = data["features"][0]
+            return {
+                "coordinates": feature["geometry"]["coordinates"],
+                "place_name": feature["place_name"],
+                "city": city,
+                "country": country,
+                "proximity_used": {
+                    "latitude": proximity_latitude,
+                    "longitude": proximity_longitude,
+                },
+                "full_response": feature,
+            }
+        else:
+            return {"error": f"No results found for '{address}' in {city}, {country}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def reverse_geocode(latitude: float, longitude: float) -> dict:
+    try:
+        url = (
+            f"{MAPBOX_API_BASE}/geocoding/v5/mapbox.places/{longitude},{latitude}.json"
+        )
+        params = {"access_token": MAPBOX_TOKEN}
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("features"):
+            feature = data["features"][0]
+            return {
+                "address": feature["place_name"],
+                "coordinates": [longitude, latitude],
+                "full_response": feature,
+            }
+        else:
+            return {"error": "No results found"}
+    except Exception as e:
+        return {"error": str(e)}
