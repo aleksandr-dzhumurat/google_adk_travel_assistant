@@ -1,9 +1,8 @@
 # src/__init__.py
 
-from .utils import validate_env_variables, get_mapbox_token, format_coordinates
+from .utils import format_coordinates, get_mapbox_token
 
 __all__ = [
-    'validate_env_variables',
     'get_mapbox_token',
     'format_coordinates'
 ]

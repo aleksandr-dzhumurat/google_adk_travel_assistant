@@ -1,23 +1,22 @@
-# src/utils/__init__.py
+# # src/utils/__init__.py
 
 import os
 from typing import Optional
 
+# def validate_env_variables() -> bool:
+#     """Validate that required environment variables are set."""
+#     required_vars = ['MAPBOX_ACCESS_TOKEN']
 
-def validate_env_variables() -> bool:
-    """Validate that required environment variables are set."""
-    required_vars = ['MAPBOX_ACCESS_TOKEN']
+#     missing = []
+#     for var in required_vars:
+#         if not os.getenv(var):
+#             missing.append(var)
 
-    missing = []
-    for var in required_vars:
-        if not os.getenv(var):
-            missing.append(var)
+#     if missing:
+#         print(f"ERROR: Missing required environment variables: {', '.join(missing)}")
+#         return False
 
-    if missing:
-        print(f"ERROR: Missing required environment variables: {', '.join(missing)}")
-        return False
-
-    return True
+#     return True
 
 
 def get_mapbox_token() -> Optional[str]:
@@ -32,16 +31,15 @@ def format_coordinates(lat: float, lon: float) -> str:
     return f"{abs(lat):.4f}°{lat_dir}, {abs(lon):.4f}°{lon_dir}"
 
 
-# Export submodules
-from .event_handler import EventProcessor, process_runner_events
-from .stderr_filter import apply_stderr_filter, StderrFilter
+# # Export submodules
+# from .stderr_filter import apply_stderr_filter, StderrFilter
 
-__all__ = [
-    'validate_env_variables',
-    'get_mapbox_token',
-    'format_coordinates',
-    'EventProcessor',
-    'process_runner_events',
-    'apply_stderr_filter',
-    'StderrFilter'
-]
+# __all__ = [
+#     'validate_env_variables',
+#     'get_mapbox_token',
+#     'format_coordinates',
+#     'EventProcessor',
+#     'process_runner_events',
+#     'apply_stderr_filter',
+#     'StderrFilter'
+# ]

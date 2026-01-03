@@ -42,3 +42,5 @@ build/
 .claude
 
 docs/
+.history/
+data/
