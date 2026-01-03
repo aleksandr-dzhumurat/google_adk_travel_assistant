@@ -1,44 +1,33 @@
 CURRENT_DIR = $(shell pwd)
+NETWORK_NAME = backtier_network
 include .env
 export
 
-.PHONY: help test test-agent test-setup install clean run-perplexity chat configure-langfuse
+.PHONY: help test test-agent test-setup install clean run-perplexity chat list-redis configure-langfuse redis-start redis-stop api-dev api-prod api-test
 
-setup: ## Initial setup - copy env file
-	@echo "⚙️  Initial project setup..."
-	@if [ ! -f .env ]; then \
-		cp .env.example .env; \
-		echo "📝 Created .env file from template"; \
-		echo "⚠️  Please edit .env and add your Mapbox token"; \
-	else \
-		echo "✅ .env file already exists"; \
-	fi
+prepare-dirs:
+	mkdir -p ${CURRENT_DIR}/data/redis_data || true
 
-# Testing
-test-setup: ## Verify environment configuration
-	@echo "🔍 Checking environment setup..."
-	PYTHONPATH=src uv run python scripts/test_setup.py
+stop-redis:
+	docker container rm -f redis-server || true
+
+build-network:
+	docker network create ${NETWORK_NAME} -d bridge || true
+
+run-redis: build-network stop-redis
+	@echo "🛑 Stopping Redis..."
+	@docker run -d \
+	--name redis-server \
+	-p 6379:6379 \
+	--network ${NETWORK_NAME} \
+	-v ${CURRENT_DIR}/data/redis-data:/data \
+	redis:8.0.0 \
+	redis-server --appendonly yes
 
 test-agent: ## Test agent tools (geocoding, routing, etc.)
 	@echo "🧪 Testing agent tools..."
 	PYTHONPATH=src uv run python scripts/test_agent.py
 
-test: test-setup test-agent ## Run all tests
-
-# Environment validation
-check-env: ## Check if environment is properly configured
-	@echo "🔍 Checking environment configuration..."
-	@if [ ! -f .env ]; then \
-		echo "❌ .env file missing - run 'make setup'"; \
-		exit 1; \
-	fi
-	@if ! grep -q "MAPBOX_ACCESS_TOKEN=" .env 2>/dev/null; then \
-		echo "❌ Mapbox access token not configured in .env"; \
-		exit 1; \
-	fi
-	@echo "✅ Environment configuration looks good!"
-
-# Cleanup
 clean: ## Remove Python cache files
 	@echo "🧹 Cleaning up..."
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
@@ -46,30 +35,23 @@ clean: ## Remove Python cache files
 	find . -type f -name "*.pyo" -delete 2>/dev/null || true
 	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 
-clean-all: clean ## Remove cache and virtual environment
-	@echo "🧹 Deep cleaning..."
-	rm -rf .venv
-
-# Development
-dev: setup install test ## Complete development setup
-	@echo ""
-	@echo "✅ Development environment ready!"
-	@echo ""
-	@echo "Available commands:"
-	@echo "  make test-agent   - Test agent tools"
-	@echo "  make chat         - Start interactive chat"
-	@echo ""
-
-# Quick commands
-quick-test: test-agent ## Quick test of agent functionality
-
 run-perplexity: ## Run Perplexity event searcher
 	ENV_FILE_PATH=${CURRENT_DIR}/.env uv run python src/agent/perplexity.py
 
-chat: ## Start interactive chat with the agent
-	@echo "💬 Starting interactive chat with agent..."
-	PYTHONPATH=src uv run python scripts/chat.py
+chat: ## Start interactive chat with the FastAPI agent
+	@echo "💬 Starting interactive chat with FastAPI agent..."
+	@echo "📝 Make sure API server is running (make api-dev in another terminal)"
+	PYTHONPATH=src uv run python scripts/test_chat.py
 
-configure-langfuse: ## Configure Langfuse model pricing for cost tracking
-	@echo "🔧 Configuring Langfuse model pricing..."
-	uv run python scripts/configure_langfuse_model.py
+list-redis: ## List all Redis sessions with message counts
+	@echo "📊 Listing Redis sessions..."
+	PYTHONPATH=src uv run python scripts/test_redis.py
+
+api-dev: run-redis
+	@echo "🚀 Starting FastAPI development server..."
+	PYTHONPATH=src uv run uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+
+api-prod: ## Start FastAPI in production mode
+	@echo "🚀 Starting FastAPI production server..."
+	@echo "📝 Make sure Redis is running (make redis-start)"
+	PYTHONPATH=src uv run uvicorn src.api.app:app --workers 4 --host 0.0.0.0 --port 8000
