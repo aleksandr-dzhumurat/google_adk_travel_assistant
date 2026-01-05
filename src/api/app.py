@@ -1,5 +1,6 @@
 """FastAPI application for multi-user event discovery system."""
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import timedelta
 
@@ -34,6 +35,9 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting FastAPI application...")
 
+    # Create ThreadPoolExecutor
+    executor = ThreadPoolExecutor(max_workers=4)
+
     # Create Redis store
     redis_store = RedisSessionStore(
         redis_url=settings.redis_url,
@@ -47,7 +51,7 @@ async def lifespan(app: FastAPI):
     logger.info("Redis connection established")
 
     # Create agent factory
-    agent_factory = AgentFactory(settings)
+    agent_factory = AgentFactory(settings, executor)
 
     # Create session manager
     session_manager = DistributedSessionManager(
@@ -66,6 +70,9 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down application...")
+
+    # Cleanup ThreadPoolExecutor
+    executor.shutdown()
 
     # Cleanup Redis
     await redis_store.close()

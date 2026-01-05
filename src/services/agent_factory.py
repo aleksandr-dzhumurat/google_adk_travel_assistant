@@ -1,22 +1,29 @@
 """Factory for creating agent instances with dependencies."""
+from concurrent.futures import ThreadPoolExecutor
+
 from pydantic_ai import Agent
+from pydantic_ai.models.gemini import GeminiModel
 
 from ..agent.perplexity import EventSearcher
-from ..agent.pydantic_agent import AgentDependencies, event_agent
+from ..agent.pydantic_agent import AgentDependencies, get_tools
 from ..config.settings import Settings
 
 
 class AgentFactory:
     """Factory for creating agent instances with dependency injection."""
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, executor: ThreadPoolExecutor):
         """Initialize agent factory.
 
         Args:
             settings: Application settings instance
+            executor: ThreadPoolExecutor for running sync operations
         """
         self.settings = settings
         self.event_searcher = EventSearcher(api_key=settings.perplexity_api_key)
+        self.executor = executor
+        with open("src/agent/system_prompt.txt", "r") as f:
+            self.system_prompt = f.read()
 
     def create_agent(self) -> Agent:
         """Create agent instance.
@@ -27,7 +34,14 @@ class AgentFactory:
         Returns:
             Agent instance
         """
-        return event_agent
+        return Agent(
+            model=GeminiModel(self.settings.gemini_model),
+            deps_type=AgentDependencies,
+            system_prompt=self.system_prompt,
+            tools=get_tools(self.executor),
+            retries=2,
+            end_strategy="exhaustive",  # Execute ALL tool calls, don't stop early
+        )
 
     def create_dependencies(self) -> AgentDependencies:
         """Create dependencies for agent context.

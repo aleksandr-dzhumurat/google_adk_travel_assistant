@@ -3,7 +3,13 @@ NETWORK_NAME = backtier_network
 include .env
 export
 
-.PHONY: help test test-agent test-setup install clean run-perplexity chat list-redis configure-langfuse redis-start redis-stop api-dev api-prod api-test
+.PHONY: all help test test-agent test-setup install clean run-perplexity chat list-redis configure-langfuse redis-start redis-stop api-dev api-prod api-test
+
+all: help
+
+help:
+	@echo "Available commands:"
+	@awk -F':.*?## ' '/^[a-zA-Z_-]+:.*?## / { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 prepare-dirs:
 	mkdir -p ${CURRENT_DIR}/data/redis_data || true
@@ -41,7 +47,7 @@ run-perplexity: ## Run Perplexity event searcher
 chat: ## Start interactive chat with the FastAPI agent
 	@echo "💬 Starting interactive chat with FastAPI agent..."
 	@echo "📝 Make sure API server is running (make api-dev in another terminal)"
-	PYTHONPATH=src uv run python scripts/test_chat.py
+	PYTHONPATH=src python scripts/test_chat.py
 
 list-redis: ## List all Redis sessions with message counts
 	@echo "📊 Listing Redis sessions..."
@@ -49,9 +55,19 @@ list-redis: ## List all Redis sessions with message counts
 
 api-dev: run-redis
 	@echo "🚀 Starting FastAPI development server..."
-	PYTHONPATH=src uv run uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+	PYTHONPATH=src uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
 
 api-prod: ## Start FastAPI in production mode
 	@echo "🚀 Starting FastAPI production server..."
 	@echo "📝 Make sure Redis is running (make redis-start)"
 	PYTHONPATH=src uv run uvicorn src.api.app:app --workers 4 --host 0.0.0.0 --port 8000
+
+test-api: run-redis ## Test API health check
+	@echo "🧪 Testing API..."
+	.venv/bin/uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000 & \
+	PID=$$! ; \
+	sleep 5 && \
+	curl -f http://localhost:8000/api/v1/health ; \
+	kill $$PID
+
+api-test: test-api ## Run the API health check test

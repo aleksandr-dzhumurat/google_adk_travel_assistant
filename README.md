@@ -287,6 +287,7 @@ make list-redis        # List all Redis sessions with message counts
 make test-agent        # Test geocoding tools
 make test-setup        # Verify environment configuration
 make run-perplexity    # Test Perplexity event search directly
+make api-test          # Test API health check
 
 # Optional
 make configure-langfuse # Configure Langfuse model pricing (optional)

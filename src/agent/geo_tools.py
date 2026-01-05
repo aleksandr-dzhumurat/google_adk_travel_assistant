@@ -1,29 +1,24 @@
-import os
-
-import requests
-from dotenv import load_dotenv
-
-print(f"Loaded vars: {load_dotenv()}")
-
-MAPBOX_TOKEN = os.getenv("MAPBOX_ACCESS_TOKEN")
-if not MAPBOX_TOKEN:
-    raise ValueError("MAPBOX_ACCESS_TOKEN not found in .env file")
+"""Asynchronous geocoding tools using Mapbox API and httpx."""
+import httpx
+from urllib.parse import quote
 
 MAPBOX_API_BASE = "https://api.mapbox.com"
 
 
-def get_city_center(city: str, country: str) -> dict:
+async def get_city_center(city: str, country: str, mapbox_token: str) -> dict:
+    """Get the center coordinates of a city."""
     try:
         query = f"{city}, {country}"
-        url = f"{MAPBOX_API_BASE}/geocoding/v5/mapbox.places/{requests.utils.quote(query)}.json"
+        url = f"{MAPBOX_API_BASE}/geocoding/v5/mapbox.places/{quote(query)}.json"
         params = {
-            "access_token": MAPBOX_TOKEN,
+            "access_token": mapbox_token,
             "limit": 1,
             "types": "place",
         }
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        data = response.json()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
 
         if data.get("features"):
             feature = data["features"][0]
@@ -41,13 +36,15 @@ def get_city_center(city: str, country: str) -> dict:
         return {"error": str(e)}
 
 
-def geocode_address(address: str) -> dict:
+async def geocode_address(address: str, mapbox_token: str) -> dict:
+    """Convert address to coordinates (basic version)."""
     try:
-        url = f"{MAPBOX_API_BASE}/geocoding/v5/mapbox.places/{requests.utils.quote(address)}.json"
-        params = {"access_token": MAPBOX_TOKEN, "limit": 1}
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        data = response.json()
+        url = f"{MAPBOX_API_BASE}/geocoding/v5/mapbox.places/{quote(address)}.json"
+        params = {"access_token": mapbox_token, "limit": 1}
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
 
         if data.get("features"):
             feature = data["features"][0]
@@ -62,16 +59,18 @@ def geocode_address(address: str) -> dict:
         return {"error": str(e)}
 
 
-def geocode_address_near(
+async def geocode_address_near(
     address: str,
     proximity_latitude: float,
     proximity_longitude: float,
     city: str,
     country: str,
+    mapbox_token: str,
 ) -> dict:
+    """Convert addresses to coordinates with strong locality constraints."""
     try:
         enhanced_query = f"{address}, {city}, {country}"
-        url = f"{MAPBOX_API_BASE}/geocoding/v5/mapbox.places/{requests.utils.quote(enhanced_query)}.json"
+        url = f"{MAPBOX_API_BASE}/geocoding/v5/mapbox.places/{quote(enhanced_query)}.json"
 
         bbox_delta = 0.45
         bbox = (
@@ -80,14 +79,15 @@ def geocode_address_near(
         )
 
         params = {
-            "access_token": MAPBOX_TOKEN,
+            "access_token": mapbox_token,
             "limit": 1,
             "proximity": f"{proximity_longitude},{proximity_latitude}",
             "bbox": bbox,
         }
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        data = response.json()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
 
         if data.get("features"):
             feature = data["features"][0]
@@ -108,15 +108,15 @@ def geocode_address_near(
         return {"error": str(e)}
 
 
-def reverse_geocode(latitude: float, longitude: float) -> dict:
+async def reverse_geocode(latitude: float, longitude: float, mapbox_token: str) -> dict:
+    """Convert coordinates to human-readable address."""
     try:
-        url = (
-            f"{MAPBOX_API_BASE}/geocoding/v5/mapbox.places/{longitude},{latitude}.json"
-        )
-        params = {"access_token": MAPBOX_TOKEN}
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        data = response.json()
+        url = f"{MAPBOX_API_BASE}/geocoding/v5/mapbox.places/{longitude},{latitude}.json"
+        params = {"access_token": mapbox_token}
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
 
         if data.get("features"):
             feature = data["features"][0]
